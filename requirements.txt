@@ -1,0 +1,5 @@
+# Python dependencies required for development
+# python==3.9
+torch==2.0.1
+matplotlib
+tqdm
