@@ -47,7 +47,7 @@ class Policy_Network(nn.Module):
             nn.Linear(hidden_space2, action_space_dims)
         )
 
-    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor):
         """Conditioned on the observation, returns the mean and standard deviation
          of a normal distribution from which an action is sampled from.
 
@@ -58,13 +58,13 @@ class Policy_Network(nn.Module):
             action_means: predicted mean of the normal distribution
             action_stddevs: predicted standard deviation of the normal distribution
         """
+
         shared_features = self.shared_net(x.float())
 
         action_means = self.policy_mean_net(shared_features)
         action_stddevs = torch.log(
             1 + torch.exp(self.policy_stddev_net(shared_features))
         )
-
         return action_means, action_stddevs
     
 class REINFORCE:
@@ -108,6 +108,7 @@ class REINFORCE:
         action = distrib.sample()
         prob = distrib.log_prob(action)
 
+
         action = action.numpy()
 
         self.probs.append(prob)
@@ -144,7 +145,7 @@ class REINFORCE:
 env = gym.make("Pusher-v4", render_mode="human")
 wrapped_env = gym.wrappers.RecordEpisodeStatistics(env, 100)  # Records episode-reward
 
-total_num_episodes = int(5e3)  # Total number of episodes
+total_num_episodes = int(5e4)  # Total number of episodes
 # Observation-space of InvertedPendulum-v4 (4)
 obs_space_dims = env.observation_space.shape[0]
 # Action-space of InvertedPendulum-v4 (1)

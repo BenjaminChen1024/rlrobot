@@ -38,12 +38,9 @@ EPS_DECAY = 1000
 TAU = 0.005
 LR = 1e-4
 
-print(env.action_space[-1])
-
-raise NotImplementedError
 
 # Get number of actions from gym action space
-n_actions = env.action_space[0]
+n_actions = env.action_space.shape[0]
 # Get the number of state observations
 state, info = env.reset()
 n_observations = len(state)
