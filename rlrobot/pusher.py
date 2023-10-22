@@ -13,7 +13,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Create pusher envs
 env = gym.make("Pusher-v4", render_mode="human")
 # Creatre algorithm
-agent = DQN(env)
+agent = DQN(env, device)
 
 # Training loop
 num_episodes = 600

@@ -1,0 +1,9 @@
+
+[2023.10.21]	RuntimeError: mat1 and mat2 must have the same dtype, but got Double and Float
+Solution: 	dtype=torch.float64 -> dtype=torch.float32
+[2023.10.21]	TypeError: can't convert cuda:0 device type tensor to numpy. Use Tensor.cpu() to copy the tensor to host memory first.
+Solution: 	action = self.policy_net(state).numpy() -> action = self.policy_net(state).cpu().numpy()
+Solution: 	action = self.policy_net(state)
+		action = action[0].cpu().numpy()
+[2023.10.21]	RuntimeError: mat1 and mat2 shapes cannot be multiplied (1x2944 and 23x128)
+Solution:	state = torch.tensor(state, dtype=torch.float32, device=self.device) -> state = torch.tensor([state], dtype=torch.float32, device=self.device)

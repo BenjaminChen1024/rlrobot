@@ -27,7 +27,7 @@ class DQN:
 
         # DQN parameters
         self.learning_rate = 1e-4
-        self.batch_size = 128
+        self.batch_size = 3
         self.gamma = 0.99
         self.tau = 0.005
 
@@ -37,8 +37,8 @@ class DQN:
 
         # DQN components
         self.env = env
-        self.policy_net = QNet(self.observation_space.shape[0], self.action_space.shape[0]).to(self.device)
-        self.target_net = QNet(self.observation_space.shape[0], self.action_space.shape[0]).to(self.device)
+        self.policy_net = QNet(self.observation_space.shape[0], self.action_space.shape[0], 128).to(self.device)
+        self.target_net = QNet(self.observation_space.shape[0], self.action_space.shape[0],128).to(self.device)
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=self.learning_rate)
 
         # Action noise
@@ -61,21 +61,24 @@ class DQN:
     """
 
     def act(self,state):
+
         sample = random.random()
         eps_threshold = 0.05 + (0.9 - 0.05) * math.exp(-1.* self.steps_done / 1000)
         self.steps_done += 1
 
         if sample > eps_threshold:
             with torch.no_grad():
-
-                print(state)
-                return self.policy_net(state)
+                action = self.policy_net(state)
         else:
-            return self.action_space.sample()
+            action = torch.tensor([self.action_space.sample()], dtype=torch.float32, device=self.device)
+        
+        action = torch.clamp(action*4-2, -2, 2)
+        
+        return action
     
     def log(self, show_result=False):
         plt.figure(1)
-        durations_t = torch.tensor(self.episode_durations, dtype=torch.float)
+        durations_t = torch.tensor(self.episode_durations)
         if show_result:
             plt.title('Result')
         else:
@@ -98,17 +101,29 @@ class DQN:
                 return
         transitions = self.memory.sample(self.batch_size)
         batch = Transition(*zip(*transitions))
+        print(batch)
+        print(batch.action)
+        print(torch.cat(batch.action))
 
-        non_final_mask = torch.tensor(tuple(map(lambda s: s is not None, batch.next_state)), device=self.device, dtype=torch.bool)
         non_final_next_states = torch.cat([s for s in batch.next_state if s is not None])
         state_batch = torch.cat(batch.state)
         action_batch = torch.cat(batch.action)
-        reward_batch = batch.reward
+        reward_batch = torch.cat(batch.reward)
+
+        print(action_batch)
         print(state_batch)
-        state_action_values = self.policy_net(state_batch).gather(1, action_batch)
-        next_state_values = torch.zeros(self.batch_size, device=self.device)
+        print(self.policy_net(state_batch))
+
+        state_action_values = self.policy_net(state_batch)
+
+        print(state_action_values)
+
         with torch.no_grad():
-            next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(1)[0]
+            print(non_final_next_states)
+            next_state_values = self.target_net(non_final_next_states)
+            print(next_state_values)
+            print(state_action_values)
+
         # Compute the expected Q values
         expected_state_action_values = (next_state_values * self.gamma) + reward_batch
         # Compute loss
@@ -132,29 +147,28 @@ class DQN:
     def run(self, num_episodes):
         for i in range(num_episodes):
             # Initialize the environment and get state
-            state, info = self.env.reset()
-            state = torch.tensor(state, dtype = torch.float32, device=self.device)
+            state, info = self.env.reset(seed = 1)
+            state = torch.tensor([state], dtype=torch.float32, device=self.device)
             for t in count():
                 # Compute the action
                 action = self.act(state)
-                action = torch.tensor(action, dtype=torch.float32, device=self.device)
-
+                action = action[0].cpu().numpy()
                 # Step the environment
                 observation, reward, terminated, truncated, info = self.env.step(action)
-                reward = torch.tensor(reward, dtype = torch.float32, device=self.device)
+                action = torch.tensor([action], device=self.device)
+                reward = torch.tensor([reward], device=self.device)
                 done = terminated or truncated
 
                 if terminated:
                     next_state = None
                 else:
-                    next_state = torch.tensor(observation, dtype=torch.float32, device=self.device)
+                    next_state = torch.tensor([observation], dtype=torch.float32, device=self.device)
                 
                 # Store the transition in memort
                 self.memory.push(state, action, next_state, reward)
 
                 # Move to the next state
                 state = next_state
-
                 self.update()
 
                 if done:
