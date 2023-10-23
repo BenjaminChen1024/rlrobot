@@ -20,7 +20,8 @@ class PPO:
         self.device= device
 
         self.max_ep_len = 1000                   # max timesteps in one episode
-        self.max_training_timesteps = int(3e6)   # break training loop if timeteps > max_training_timesteps
+        self.max_training_timesteps = int(1e6)   # break training loop if timeteps > max_training_timesteps
+        self.total_test_episodes = 100    # total num of testing episodes
 
         self.print_freq = self.max_ep_len * 10        # print avg reward in the interval (in num timesteps)
         self.log_freq = self.max_ep_len * 2           # log avg reward in the interval (in num timesteps)
@@ -32,6 +33,7 @@ class PPO:
         self.action_std_decay_freq = int(2.5e5)  # action_std decay frequency (in num timesteps)
 
 
+
         # PPO hyperparameters
         self.update_timestep = self.max_ep_len * 4    # update policy every n timesteps
         self.K_epochs = 80                  # update policy for K epochs in one PPO update
@@ -39,7 +41,7 @@ class PPO:
         self.gamma = 0.99                   # discount factor
         self.lr_actor = 0.0003              # learning rate for actor network
         self.lr_critic = 0.001              # learning rate for critic network
-        self.random_seed = 0                     # set random seed if required (0 = no random seed)
+        self.random_seed = 0                # set random seed if required (0 = no random seed)
 
         # Create environment
         self.env = gym.make(self.env_name, render_mode='human')
@@ -196,7 +198,7 @@ class PPO:
         print("logging at : " + self.log_f_name)
 
         # checkpointing 
-        run_num_pretrained = 0      # change this to prevent overwriting weights in same env_name folder
+        self.run_num_pretrained = 0      # change this to prevent overwriting weights in same env_name folder
 
         directory = "log/PPO_preTrained"
         if not os.path.exists(directory):
@@ -206,8 +208,8 @@ class PPO:
         if not os.path.exists(directory):
             os.makedirs(directory)
 
-        checkpoint_path = directory + "PPO_{}_{}_{}.pth".format(self.env_name, self.random_seed, run_num_pretrained)
-        print("save checkpoint path : " + checkpoint_path)
+        self.checkpoint_path = directory + "PPO_{}_{}_{}.pth".format(self.env_name, self.random_seed, self.run_num_pretrained)
+        print("save checkpoint path : " + self.checkpoint_path)
 
     def print(self):
         print("--------------------------------------------------------------------------------------------")
@@ -253,7 +255,7 @@ class PPO:
         start_time = datetime.now().replace(microsecond=0)
         print("Started training at (GMT) : ", start_time)
 
-        print("============================================================================================")
+        print("=========================================================================")
 
         # logging file
         log_f = open(self.log_f_name,"w+")
@@ -270,7 +272,7 @@ class PPO:
         i_episode = 0
 
         # training loop
-        while time_step <= self.max_training_timesteps:
+        while time_step <= self.max_training_timesteps or print_avg_reward >= -50:
 
             state = self.env.reset()
             state = state[0]
@@ -330,7 +332,7 @@ class PPO:
                     self.save(self.checkpoint_path)
                     print("model saved")
                     print("Elapsed Time  : ", datetime.now().replace(microsecond=0) - start_time)
-                    print("--------------------------------------------------------------------------------------------")
+                    print("----------------------------------------------------------------------------")
 
                 # break; if the episode is over
                 if done:
@@ -348,12 +350,57 @@ class PPO:
         self.env.close()
 
         # print total training time
-        print("============================================================================================")
+        print("=========================================================================")
         end_time = datetime.now().replace(microsecond=0)
         print("Started training at (GMT) : ", start_time)
         print("Finished training at (GMT) : ", end_time)
         print("Total training time  : ", end_time - start_time)
-        print("============================================================================================")
+        print("=========================================================================")
+
+    def test(self):
+        self.log()
+
+        directory = "log/PPO_preTrained" + '/' + env_name + '/'
+        checkpoint_path = directory + "PPO_{}_{}_{}.pth".format(env_name, self.random_seed, self.run_num_pretrained)
+        print("loading network from : " + checkpoint_path)
+
+        self.load(checkpoint_path)
+
+        print("-------------------------------------------------------------------------")
+
+        test_running_reward = 0
+
+        for ep in range(1, self.total_test_episodes+1):
+            ep_reward = 0
+            state = self.env.reset()
+            state = state[0]
+
+            for t in range(1, self.max_ep_len+1):
+                action = self.select_action(state)
+                state, reward, terminated, truncated, info = self.env.step(action)
+                done = truncated
+
+                ep_reward += reward
+
+                if done:
+                    break
+
+            # clear buffer
+            self.buffer.clear()
+
+            test_running_reward +=  ep_reward
+            print('Episode: {} \t\t Reward: {}'.format(ep, round(ep_reward, 2)))
+            ep_reward = 0
+
+        self.env.close()
+
+        print("==========================================================================")
+
+        avg_test_reward = test_running_reward / self.total_test_episodes
+        avg_test_reward = round(avg_test_reward, 2)
+        print("average test reward : " + str(avg_test_reward))
+
+        print("==========================================================================")
 
 
 if __name__ == '__main__':
@@ -372,8 +419,10 @@ if __name__ == '__main__':
     print("Training environment name : " + env_name)
     # Creatre agent
     agent = PPO(env_name, has_continuous_action_space, device)
-    # Training loop
-    agent.train()
+    # Train agent
+    # agent.train()
+    # Test agent
+    agent.test()
     
     
     
